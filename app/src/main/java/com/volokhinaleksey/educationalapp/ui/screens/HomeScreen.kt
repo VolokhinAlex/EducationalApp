@@ -1,8 +1,10 @@
 package com.volokhinaleksey.educationalapp.ui.screens
 
+import android.os.CountDownTimer
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,33 +15,54 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.volokhinaleksey.educationalapp.R
+import com.volokhinaleksey.educationalapp.models.ui.HomeworkDataUI
+import com.volokhinaleksey.educationalapp.models.ui.ScheduleUI
 import com.volokhinaleksey.educationalapp.ui.theme.LightCyan
 import com.volokhinaleksey.educationalapp.ui.theme.LightGreen
+import com.volokhinaleksey.educationalapp.ui.widgets.HomeWorkCard
+import com.volokhinaleksey.educationalapp.viewmodel.HomeScreenViewModel
+import org.koin.androidx.compose.koinViewModel
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Calendar
+import java.util.Date
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(viewModel: HomeScreenViewModel = koinViewModel()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -50,9 +73,13 @@ fun HomeScreen() {
 
         HeroClock()
 
-        Classes()
+        viewModel.currentLesson.observeAsState().value?.let {
+            Classes(it)
+        }
 
-        HomeWork()
+        viewModel.data.observeAsState().value?.let {
+            HomeWork(homeworkUI = it)
+        }
     }
 }
 
@@ -97,6 +124,15 @@ fun TopBar() {
 
 @Composable
 fun HeroClock() {
+    var remainingTime by remember {
+        mutableStateOf(Duration.ZERO)
+    }
+    val formatter = DateTimeFormatter.ofPattern("yyyyMMdd")
+    CountDownTimerExams(
+        targetDate = LocalDate.parse("20230429", formatter).atStartOfDay(),
+        onTimerStarted = {
+            remainingTime = it
+        })
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -132,7 +168,11 @@ fun HeroClock() {
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "0",
+                                text = if (remainingTime.inWholeDays < 10) {
+                                    "0"
+                                } else {
+                                    "${remainingTime.inWholeDays.toString()[0]}"
+                                },
                                 color = Color.White,
                                 fontWeight = FontWeight.Black,
                                 modifier = Modifier.padding(2.dp)
@@ -148,7 +188,11 @@ fun HeroClock() {
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "9",
+                                text = if (remainingTime.inWholeDays < 10) {
+                                    "${remainingTime.inWholeDays}"
+                                } else {
+                                    "${remainingTime.inWholeDays.toString()[1]}"
+                                },
                                 color = Color.White,
                                 fontWeight = FontWeight.Black,
                                 modifier = Modifier.padding(2.dp)
@@ -161,7 +205,8 @@ fun HeroClock() {
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 10.dp)
                 )
             }
             Column(
@@ -188,7 +233,11 @@ fun HeroClock() {
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "2",
+                                text = if ((remainingTime.inWholeHours % 24) < 10) {
+                                    "0"
+                                } else {
+                                    "${(remainingTime.inWholeHours % 24).toString()[0]}"
+                                },
                                 color = Color.White,
                                 fontWeight = FontWeight.Black,
                                 modifier = Modifier.padding(2.dp)
@@ -204,7 +253,11 @@ fun HeroClock() {
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "3",
+                                text = if ((remainingTime.inWholeHours % 24) < 10) {
+                                    "${remainingTime.inWholeHours % 24}"
+                                } else {
+                                    "${(remainingTime.inWholeHours % 24).toString()[1]}"
+                                },
                                 color = Color.White,
                                 fontWeight = FontWeight.Black,
                                 modifier = Modifier.padding(2.dp)
@@ -217,7 +270,8 @@ fun HeroClock() {
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 10.dp)
                 )
             }
             Column(
@@ -245,7 +299,9 @@ fun HeroClock() {
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "5",
+                                text = if ((remainingTime.inWholeMinutes % 60) < 10) "0" else {
+                                    "${(remainingTime.inWholeMinutes % 60).toString()[0]}"
+                                },
                                 color = Color.White,
                                 fontWeight = FontWeight.Black,
                                 modifier = Modifier.padding(2.dp)
@@ -261,7 +317,11 @@ fun HeroClock() {
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "9",
+                                text = if ((remainingTime.inWholeMinutes % 60) < 10) {
+                                    "${(remainingTime.inWholeMinutes % 60)}"
+                                } else {
+                                    "${(remainingTime.inWholeMinutes % 60).toString()[1]}"
+                                },
                                 color = Color.White,
                                 fontWeight = FontWeight.Black,
                                 modifier = Modifier.padding(2.dp)
@@ -274,7 +334,8 @@ fun HeroClock() {
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 10.dp)
                 )
             }
         }
@@ -282,7 +343,8 @@ fun HeroClock() {
 }
 
 @Composable
-fun Classes() {
+fun Classes(scheduleClass: ScheduleUI) {
+    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -291,7 +353,11 @@ fun Classes() {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(text = "Classes", color = Color.White)
-        Text(text = "6 classes today", color = Color.Gray)
+        Text(
+            text = "6 classes today", color = Color(
+                0xFF5F6065
+            )
+        )
     }
 
     Box(
@@ -314,14 +380,14 @@ fun Classes() {
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.arrow_160075),
-                        contentDescription = "History",
+                        painter = painterResource(id = scheduleClass.icon),
+                        contentDescription = scheduleClass.lesson,
                         modifier = Modifier.rotate(-25f)
                     )
                 }
                 Column(modifier = Modifier.padding(start = 15.dp)) {
                     Text(
-                        text = "History",
+                        text = scheduleClass.lesson,
                         color = Color.White,
                         modifier = Modifier.padding(bottom = 10.dp)
                     )
@@ -332,9 +398,15 @@ fun Classes() {
                             modifier = Modifier
                                 .size(16.dp)
                                 .padding(end = 4.dp),
-                            tint = Color.Gray
+                            tint = Color(
+                                0xFF5F6065
+                            )
                         )
-                        Text(text = "8:00 - 8:45", fontSize = 14.sp, color = Color.Gray)
+                        Text(
+                            text = scheduleClass.lessonTime, fontSize = 14.sp, color = Color(
+                                0xFF5F6065
+                            )
+                        )
                     }
                 }
             }
@@ -350,6 +422,7 @@ fun Classes() {
                                 bottomEnd = 20.dp
                             )
                         )
+                        .clickable { openInSkype(context = context) }
                         .background(Color(0xFF4BCFFF))
                         .padding(0.dp, 25.dp)
                         .rotate(90f),
@@ -382,95 +455,55 @@ fun Classes() {
 }
 
 @Composable
-fun HomeWork() {
+fun HomeWork(homeworkUI: List<HomeworkDataUI>) {
     Text(text = "Homework", color = Color.White)
 
     LazyRow(modifier = Modifier.padding(top = 20.dp)) {
-        items(5) {
-            Column(
-                modifier = Modifier
+        itemsIndexed(homeworkUI) { _, item ->
+            HomeWorkCard(
+                homeworkDataUI = item, modifier = Modifier
                     .width(220.dp)
                     .padding(end = 10.dp)
                     .clip(RoundedCornerShape(20.dp))
                     .background(Color(0xFF252830))
                     .padding(20.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "Literature",
-                            color = Color.White,
-                            modifier = Modifier.padding(bottom = 5.dp)
-                        )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.clock),
-                                contentDescription = "time",
-                                tint = Color(0xFFC44563),
-                                modifier = Modifier
-                                    .size(14.dp)
-                                    .padding(end = 3.dp)
-                            )
-                            Text(
-                                text = "2 days left",
-                                color = Color(0xFFC44563),
-                                fontSize = 14.sp
-                            )
-                        }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(50.dp)
-                            .clip(RoundedCornerShape(40))
-                            .background(Color(0xFF2F3138)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.book_148200),
-                            contentDescription = "Literature"
-                        )
-                    }
-                }
-                Text(
-                    text = "Read scenes 1.1-1.12 of The Master and Margarita",
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(0.dp, 10.dp)
+                Image(
+                    painter = painterResource(id = item.icon),
+                    contentDescription = item.lesson
                 )
-                Box {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(100))
-                            .background(Color.Cyan)
-                            .padding(5.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Face,
-                            contentDescription = "",
-                            modifier = Modifier.size(15.dp)
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .padding(start = 20.dp)
-                            .clip(RoundedCornerShape(100))
-                            .background(Color.Yellow)
-                            .padding(5.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Face,
-                            contentDescription = "",
-                            modifier = Modifier.size(15.dp)
-                        )
-                    }
-                }
             }
         }
     }
 }
+
+@Composable
+fun CountDownTimerExams(
+    targetDate: LocalDateTime,
+    onTimerFinished: () -> Unit = {},
+    onTimerStarted: (Duration) -> Unit
+) {
+    var remainingTime by remember {
+        mutableStateOf(Duration.ZERO)
+    }
+
+    val startCalendar = Calendar.getInstance()
+    startCalendar.time = Date.from(LocalDateTime.now().atZone(ZoneId.systemDefault()).toInstant())
+    val endCalendar = Calendar.getInstance()
+    endCalendar.time = Date.from(targetDate.atZone(ZoneId.systemDefault()).toInstant())
+
+    LaunchedEffect(key1 = true) {
+        object : CountDownTimer(endCalendar.timeInMillis - startCalendar.timeInMillis, 1000) {
+            override fun onTick(millisUntilFinished: Long) {
+                remainingTime = millisUntilFinished.milliseconds
+            }
+
+            override fun onFinish() {
+                onTimerFinished()
+            }
+        }.start()
+    }
+    onTimerStarted(remainingTime)
+}
+
+

@@ -1,9 +1,13 @@
 package com.volokhinaleksey.educationalapp.ui.screens
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -36,17 +41,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat.startActivity
 import com.volokhinaleksey.educationalapp.R
-import com.volokhinaleksey.educationalapp.models.Step
+import com.volokhinaleksey.educationalapp.models.ui.ScheduleUI
 import com.volokhinaleksey.educationalapp.ui.theme.LightCyan
 import com.volokhinaleksey.educationalapp.ui.theme.LightGreen
+import com.volokhinaleksey.educationalapp.viewmodel.ScheduleScreenViewModel
+import org.koin.androidx.compose.koinViewModel
 
 @Composable
-fun ScheduleScreen() {
+fun ScheduleScreen(viewModel: ScheduleScreenViewModel = koinViewModel()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -54,7 +63,9 @@ fun ScheduleScreen() {
         horizontalAlignment = Alignment.Start
     ) {
         ScheduleTopBar()
-        ScheduleClasses()
+        viewModel.data.observeAsState().value?.let {
+            ScheduleClasses(scheduleClasses = it)
+        }
     }
 }
 
@@ -105,7 +116,7 @@ fun ScheduleTopBar() {
 }
 
 @Composable
-fun ScheduleClasses() {
+fun ScheduleClasses(scheduleClasses: List<ScheduleUI>) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -113,16 +124,12 @@ fun ScheduleClasses() {
     ) {
         val currentStep = remember { mutableStateOf(0) }
         VerticalStepProgressBar(
-            steps = listOf(
-                Step(title = "8:00 - 8:45"),
-                Step(title = "9:00 - 9:45"),
-                Step(title = "10:00 - 11:35", isAdditionalLesson = true),
-            ),
+            scheduleClasses = scheduleClasses,
             currentStep = currentStep.value,
             modifier = Modifier.fillMaxSize(),
             stepTitle = {
                 Text(
-                    text = it.title,
+                    text = it.lessonTime,
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(start = 10.dp)
@@ -131,23 +138,23 @@ fun ScheduleClasses() {
             stepContent = {
                 if (!it.isAdditionalLesson) {
                     LessonCard(
-                        isCurrentLesson = it.isCurrent,
+                        isCurrentLesson = it.isCurrentLesson,
                         icon = {
                             Image(
-                                painter = painterResource(id = R.drawable.arrow_160075),
-                                contentDescription = "History",
+                                painter = painterResource(id = it.icon),
+                                contentDescription = it.lesson,
                                 modifier = Modifier.rotate(-25f)
                             )
                         },
                         title = {
                             Text(
-                                text = "History",
+                                text = it.lesson,
                                 color = Color.White
                             )
                         },
                         description = {
                             Text(
-                                text = "Teacher: Mrs Barros",
+                                text = "Teacher: ${it.teacher}",
                                 fontSize = 14.sp,
                                 color = Color.Gray
                             )
@@ -155,28 +162,28 @@ fun ScheduleClasses() {
                     )
                 } else {
                     AdditionalLessonCard(
-                        isCurrentLesson = it.isCurrent,
+                        isCurrentLesson = it.isCurrentLesson,
                         icon = {
                             Image(
-                                painter = painterResource(id = R.drawable.book_148200),
-                                contentDescription = "Literature"
+                                painter = painterResource(id = it.icon),
+                                contentDescription = it.lesson
                             )
                         },
                         title = {
                             Text(
-                                text = "Physical Education", color = Color.White,
+                                text = it.lesson, color = Color.White,
                                 fontWeight = FontWeight.Bold
                             )
                         },
                         teacher = {
                             Text(
-                                text = "Teacher: Mrs Barros", color = Color.Gray,
+                                text = "Teacher: ${it.teacher}", color = Color.Gray,
                                 fontWeight = FontWeight.Light
                             )
                         },
                         description = {
                             Text(
-                                text = "Intensive preparation for The Junior World Championship in Los Angeles",
+                                text = it.description,
                                 color = Color.White,
                                 modifier = Modifier.padding(bottom = 20.dp)
                             )
@@ -190,11 +197,11 @@ fun ScheduleClasses() {
 
 @Composable
 fun VerticalStepProgressBar(
-    steps: List<Step>,
+    scheduleClasses: List<ScheduleUI>,
     currentStep: Int,
     modifier: Modifier = Modifier,
-    stepTitle: @Composable (Step) -> Unit,
-    stepContent: @Composable (Step) -> Unit
+    stepTitle: @Composable (ScheduleUI) -> Unit,
+    stepContent: @Composable (ScheduleUI) -> Unit
 ) {
     val color = Brush.linearGradient(
         listOf(
@@ -215,7 +222,7 @@ fun VerticalStepProgressBar(
             )
         }
         LazyColumn(modifier = modifier) {
-            itemsIndexed(steps) { index, item ->
+            itemsIndexed(scheduleClasses) { index, item ->
                 val stepSize = if (currentStep == index) 25.dp else 10.dp
                 val innerCircleColor = if (currentStep == index) Brush.linearGradient(
                     listOf(
@@ -245,7 +252,7 @@ fun VerticalStepProgressBar(
                 Column(
                     modifier = Modifier.padding(start = 30.dp)
                 ) {
-                    stepContent(item.copy(isCurrent = currentStep == index))
+                    stepContent(item.copy(isCurrentLesson = currentStep == index))
                 }
             }
         }
@@ -286,10 +293,12 @@ fun LessonCard(
                     description()
                 }
             }
+            val context = LocalContext.current
             if (isCurrentLesson) {
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
+                        .clickable { openInSkype(context = context) }
                         .clip(
                             RoundedCornerShape(
                                 topEnd = 20.dp,
@@ -403,5 +412,19 @@ fun AdditionalLessonCard(
                 }
             }
         }
+    }
+}
+
+fun openInSkype(context: Context) {
+    var intent = context.packageManager
+        .getLaunchIntentForPackage("com.skype.raider")
+    if (intent != null) {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(context, intent, null)
+    } else {
+        intent = Intent(Intent.ACTION_VIEW)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        intent.data = Uri.parse("market://details?id=" + "com.skype.raider")
+        startActivity(context, intent, null)
     }
 }
